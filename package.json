@@ -1,0 +1,13 @@
+{
+  "name": "switchboard-plugin-google",
+  "private": true,
+  "type": "module",
+  "version": "1.0.0",
+  "scripts": {
+    "check": "tsc --noEmit -p ."
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.9.0"
+  }
+}

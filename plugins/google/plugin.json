@@ -1,0 +1,25 @@
+{
+  "id": "google",
+  "name": "Google",
+  "version": "1.0.0",
+  "description": "Google sign-in for Google APIs. Other plugins build services such as Gmail on top of it.",
+  "dependencies": [
+    "oauth2"
+  ],
+  "icon": "icon.svg",
+  "settings": [
+    {
+      "key": "clientId",
+      "label": "OAuth client ID",
+      "description": "From a \"Web application\" OAuth client in the Google Cloud console. Add Switchboard's redirect URI to it."
+    },
+    {
+      "key": "clientSecret",
+      "label": "OAuth client secret",
+      "type": "secret"
+    }
+  ],
+  "dependencyVersions": {
+    "oauth2": "^1.0.0"
+  }
+}
