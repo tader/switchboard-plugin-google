@@ -1,0 +1,13 @@
+{
+  "id": "google-calendar",
+  "name": "Google Calendar",
+  "version": "1.0.0",
+  "description": "Calendars and events.",
+  "dependencies": [
+    "google"
+  ],
+  "icon": "icon.svg",
+  "dependencyVersions": {
+    "google": "^1.0.0"
+  }
+}

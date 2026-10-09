@@ -1,0 +1,13 @@
+{
+  "id": "google-docs",
+  "name": "Google Docs",
+  "version": "1.0.0",
+  "description": "Read and edit Google Docs documents.",
+  "dependencies": [
+    "google"
+  ],
+  "icon": "icon.svg",
+  "dependencyVersions": {
+    "google": "^1.0.0"
+  }
+}

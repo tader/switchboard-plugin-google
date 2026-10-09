@@ -1,0 +1,13 @@
+{
+  "id": "gmail",
+  "name": "Gmail",
+  "version": "1.0.0",
+  "description": "Read and send email from Gmail accounts.",
+  "dependencies": [
+    "google"
+  ],
+  "icon": "icon.svg",
+  "dependencyVersions": {
+    "google": "^1.0.0"
+  }
+}
