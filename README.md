@@ -37,3 +37,9 @@ Keep `plugin.json` and `package.json` versions in sync. Commit version changes b
 ## Releases
 
 Release-please opens version and changelog pull requests from Conventional Commits. Merge the release PR to publish its tag and GitHub release. Plugin manifests are updated with their package versions. Family repositories maintain an independent version for each plugin.
+
+## Reusable OAuth credentials
+
+With Switchboard's reusable-credentials support and the updated OAuth helper, named Drive, Calendar, Docs, Sheets, and Gmail connections can use one Google authorization. Shared credentials retain granted scopes and refresh centrally. Additional APIs request explicit additional consent; signing in as another account does not replace the shared account.
+
+Request policies preserve each connection's resource and access boundaries, including APIs on the same hostname. Read-only shared connections permit GET/HEAD requests; create a private authorization for read operations requiring POST. Drive's file-only mode cannot reuse a grant containing broader Drive scopes. Gmail's send and modify modes retain their narrower permissions. Generic wildcard Google APIs and service-account connections remain independent until they have an appropriate reusable-credential contract.

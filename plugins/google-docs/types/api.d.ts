@@ -137,7 +137,28 @@ export interface TokenResult {
     /** Updated credentials to persist (e.g. after a refresh). */
     credentials?: any;
 }
+export interface ReusableCredentials {
+  kind: 'static' | 'oauth';
+  /** Versioned authentication bundle format; matching field names alone are not compatible. */
+  format: string;
+  /** Immutable authority/client context. Never returned to clients. */
+  context(config: Record<string, any>): string;
+  requiredScopes?(config: Record<string, any>): string[];
+  grantedScopes?(credentials: any): string[];
+  /** Applies semantic provider scope implications, e.g. full Drive includes readonly Drive. */
+  coversScopes?(granted: string[], required: string[]): boolean;
+  configKeys?: string[];
+  applyToken?(req: OutgoingRequest, conn: Connection, token: TokenResult): void | Promise<void>;
+  exportCredentials?(credentials: any): any;
+  importCredentials?(credentials: any): any;
+  prepare?(config: Record<string, any>, previous: any): any;
+  validate?(conn: Connection): Promise<AccountInfo | undefined>;
+  /** Required for shared OAuth: enforce the consumer's resource and permission boundary. */
+  allowRequest?(req: OutgoingRequest, conn: Connection): boolean;
+}
+
 export interface AuthMethod {
+    reusable?: ReusableCredentials;
     /** Unique within the service, e.g. "oauth", "device", "token". */
     id: string;
     name: string;

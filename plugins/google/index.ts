@@ -1,3 +1,4 @@
+import { allowGoogleRequest, coversScopes } from './sharing-policy.ts';
 import crypto from 'node:crypto';
 import type { AuthMethod, Connection, Field, PluginContext, ServiceDefinition } from './types/api.d.ts';
 import type * as OAuth2 from './types/oauth2.d.ts';
@@ -133,8 +134,9 @@ export default function setup(ctx: PluginContext) {
       clientId: (c) => c.clientId || ctx.settings.clientId,
       clientSecret: (c) => (c.clientId ? c.clientSecret : ctx.settings.clientSecret),
       scopes,
+      reusable: ['google-drive', 'google-calendar', 'google-docs', 'google-sheets', 'gmail'].includes(o.id) ? { configKeys: ['clientId', 'clientSecret'], allowRequest: (req, conn) => allowGoogleRequest(o.id, req, conn), coversScopes } : undefined,
       // Ask for a refresh token every time, and let the user pick the account.
-      authorizeParams: { access_type: 'offline', prompt: 'consent select_account', include_granted_scopes: 'true' },
+      authorizeParams: (config) => ({ access_type: 'offline', prompt: 'consent select_account', include_granted_scopes: config.__credentialRequest?.independent ? 'false' : 'true' }),
       async identify(creds) {
         const res = await fetch('https://openidconnect.googleapis.com/v1/userinfo', { headers: { authorization: `Bearer ${creds.accessToken}` } });
         if (!res.ok) return undefined;

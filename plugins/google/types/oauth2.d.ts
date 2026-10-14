@@ -11,6 +11,7 @@ export interface OAuthCredentials {
     idToken?: string;
 }
 export interface OAuthOptions {
+    reusable?: { context?: (config: Cfg) => string; configKeys?: string[]; allowRequest: NonNullable<AuthMethod['reusable']>['allowRequest']; coversScopes?: NonNullable<AuthMethod['reusable']>['coversScopes'] };
     id?: string;
     name?: string;
     description?: string;
