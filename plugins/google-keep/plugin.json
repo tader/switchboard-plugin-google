@@ -1,7 +1,7 @@
 {
   "id": "google-keep",
   "name": "Google Keep",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Notes and lists in Google Keep, for Google Workspace, through a service account with domain-wide delegation.",
   "dependencies": [
     "google"

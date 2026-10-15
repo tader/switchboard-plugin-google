@@ -1,9 +1,9 @@
 {
-  "plugins/google-docs": "1.0.0",
-  "plugins/google": "1.0.0",
-  "plugins/google-keep": "1.1.0",
-  "plugins/google-calendar": "1.0.0",
-  "plugins/google-sheets": "1.0.0",
-  "plugins/google-drive": "1.0.0",
-  "plugins/gmail": "1.0.0"
+  "plugins/google-docs": "1.1.0",
+  "plugins/google": "1.1.0",
+  "plugins/google-keep": "1.2.0",
+  "plugins/google-calendar": "1.1.0",
+  "plugins/google-sheets": "1.1.0",
+  "plugins/google-drive": "1.1.0",
+  "plugins/gmail": "1.1.0"
 }
