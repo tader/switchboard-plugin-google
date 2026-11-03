@@ -137,7 +137,11 @@ function validTimes(value: any) {
       } catch {
         return fail("invalid_request");
       }
-      if (!Number.isFinite(Date.parse(time.dateTime)))
+      if (
+        !Number.isFinite(Date.parse(time.dateTime)) ||
+        new Date(time.dateTime.slice(0, 10)).toISOString().slice(0, 10) !==
+          time.dateTime.slice(0, 10)
+      )
         return fail("invalid_request");
     }
   }

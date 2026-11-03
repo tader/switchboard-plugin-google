@@ -248,3 +248,22 @@ test("collector checks provider auth and emits only broad invalidation metadata"
     retryAfterMs: 120000,
   });
 });
+test("timed entries reject calendar-date rollover before provider dispatch", async () => {
+  const f = fixture(() => response(allDay));
+  assert.deepEqual(
+    await call(
+      "calendar.events.create",
+      {
+        calendarId: "cal",
+        event: {
+          title: "Invalid",
+          start: { dateTime: "2026-02-30T09:00:00Z", timeZone: "UTC" },
+          end: { dateTime: "2026-03-03T10:00:00Z", timeZone: "UTC" },
+        },
+      },
+      f.ctx,
+    ),
+    { status: "rejected", code: "invalid_request" },
+  );
+  assert.equal(f.requests.length, 0);
+});
