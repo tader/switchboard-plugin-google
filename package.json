@@ -5,10 +5,12 @@
   "version": "1.0.0",
   "scripts": {
     "check": "tsc --noEmit -p .",
-    "test": "node --test test/*.test.ts"
+    "test": "node --test test/*.test.ts",
+    "integration:email": "node scripts/email-integration.ts"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
+    "ajv": "^8.20.0",
     "typescript": "^5.9.0"
   }
 }
