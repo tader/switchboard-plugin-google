@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/tader/switchboard-plugin-google/compare/gmail-v1.1.0...gmail-v1.2.0) (2026-11-04)
+
+
+### Features
+
+* support common Calendar and Gmail Email contracts ([#3](https://github.com/tader/switchboard-plugin-google/issues/3)) ([4b5f34b](https://github.com/tader/switchboard-plugin-google/commit/4b5f34bd0e401056cce2781d92f396c8f7ba9bd8))
+
 ## [1.1.0](https://github.com/tader/switchboard-plugin-google/compare/gmail-v1.0.0...gmail-v1.1.0) (2026-10-14)
 
 
