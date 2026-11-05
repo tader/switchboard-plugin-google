@@ -13,7 +13,20 @@ IDs are observation versions, not conditional-write tokens.
 
 Collections are labels. Move adds the destination label and removes only the
 explicit source label; unrelated labels stay. System state labels cannot be move
-destinations; read/flag and trash have separate operations. Label directories are
+destinations; read/flag and trash have separate operations.
+
+Gmail has no archive label, so the directory adds one writable collection
+`{id:"ARCHIVE", kind:"label", role:"archive"}`. A message belongs to it when it has
+none of INBOX, SPAM, TRASH and DRAFT (Gmail's "not in Inbox"; your own sent mail is
+included), and its `collectionIds` then list `ARCHIVE`. Listing `ARCHIVE` searches
+`-in:inbox -in:spam -in:trash -in:drafts` and drops messages whose labels changed
+meanwhile (`snapshot_changed`). Move to `ARCHIVE` removes only INBOX and keeps every
+other label; its source may be omitted or `INBOX`. Move from `ARCHIVE` adds INBOX or
+SPAM and removes nothing. Other combinations, and archiving a spam, trash or draft
+message, are rejected before any write; unarchiving a message that is not archived
+is a conflict. Gmail system label IDs are fixed and user labels are `Label_*`, so
+the ID names no real label; if the account ever reports a label `ARCHIVE`, that
+label is used as-is and no synthetic collection is added. Label directories are
 snapshots; message/draft pages state whether all accessible pages are included.
 Signed cursors bind connection/account/query and survive adapter restart. They
 cannot be edited to select another query. Collection and message reads do not mark

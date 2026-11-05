@@ -455,3 +455,218 @@ test("signed draft edits fail before any provider write and aliases/Reply-To sur
   assert.equal(p.from?.address, "alias@example.test");
   assert.equal(p.replyTo?.[0].address, "reply@example.test");
 });
+test("Gmail lists a writable archive collection with role archive, never a virtual one", async (t) => {
+  const f = await fixture(t, () =>
+    response({
+      labels: [
+        { id: "INBOX", name: "INBOX" },
+        { id: "SENT", name: "SENT" },
+        // A user label named "Archive" is an ordinary label, not the archive role.
+        { id: "Label_7", name: "Archive" },
+      ],
+    }),
+  );
+  const result = await f.call("mailboxes.list", {});
+  const archive = result.items.filter((m: any) => m.role === "archive");
+  assert.deepEqual(archive, [
+    {
+      id: "ARCHIVE",
+      name: "Archive",
+      kind: "label",
+      role: "archive",
+      canWrite: true,
+    },
+  ]);
+  assert.equal(result.items.find((m: any) => m.id === "Label_7").role, null);
+  f.ctx.connection.config.access = "readonly";
+  f.ctx.connection.credentials.scope =
+    "https://www.googleapis.com/auth/gmail.readonly";
+  const readonly = await f.call("mailboxes.list", {});
+  assert.equal(
+    readonly.items.find((m: any) => m.id === "ARCHIVE").canWrite,
+    false,
+  );
+});
+
+test("Gmail projections add the archive collection only outside inbox, spam, trash and drafts", () => {
+  const labels = (labelIds: string[]) =>
+    project({ ...textMessage(), labelIds }).collectionIds;
+  assert.deepEqual(labels(["Label_work", "IMPORTANT"]), [
+    "Label_work",
+    "IMPORTANT",
+    "ARCHIVE",
+  ]);
+  assert.deepEqual(labels(["SENT"]), ["SENT", "ARCHIVE"]);
+  for (const state of ["INBOX", "SPAM", "TRASH", "DRAFT"])
+    assert.ok(!labels([state, "Label_work"]).includes("ARCHIVE"), state);
+});
+
+test("archive move removes only INBOX and keeps every other label", async (t) => {
+  let labelIds = ["INBOX", "UNREAD", "STARRED", "Label_work", "IMPORTANT"];
+  const f = await fixture(t, (r) => {
+    const u = new URL(r.url);
+    if (u.pathname.endsWith("/labels"))
+      return response({ labels: [{ id: "INBOX" }, { id: "Label_work" }] });
+    if (u.pathname.endsWith("/modify")) {
+      const body = JSON.parse(String(r.body));
+      labelIds = labelIds
+        .filter((l) => !body.removeLabelIds.includes(l))
+        .concat(body.addLabelIds);
+      return response({ id: "m", labelIds });
+    }
+    return response({ ...textMessage("m"), labelIds });
+  });
+  for (const args of [
+    { id: "m", destinationId: "ARCHIVE", sourceCollectionId: "INBOX" },
+    { id: "m", destinationId: "ARCHIVE" },
+  ]) {
+    labelIds = ["INBOX", "UNREAD", "STARRED", "Label_work", "IMPORTANT"];
+    assert.deepEqual(await f.call("messages.move", args), {
+      status: "accepted",
+      resourceId: "m",
+    });
+    assert.deepEqual(JSON.parse(String(f.requests.at(-1)!.body)), {
+      addLabelIds: [],
+      removeLabelIds: ["INBOX"],
+    });
+    assert.equal(
+      new URL(f.requests.at(-2)!.url).searchParams.get("format"),
+      "minimal",
+    );
+  }
+  const after = await f.call("messages.get", { id: "m" });
+  assert.deepEqual(after.collectionIds, [
+    "UNREAD",
+    "STARRED",
+    "Label_work",
+    "IMPORTANT",
+    "ARCHIVE",
+  ]);
+  assert.equal(after.isFlagged, true);
+  assert.equal(after.isRead, false);
+  // Unarchive from the archive collection adds INBOX back and removes nothing.
+  await f.call("messages.move", {
+    id: "m",
+    destinationId: "INBOX",
+    sourceCollectionId: "ARCHIVE",
+  });
+  assert.deepEqual(JSON.parse(String(f.requests.at(-1)!.body)), {
+    addLabelIds: ["INBOX"],
+    removeLabelIds: [],
+  });
+  assert.ok(
+    !(await f.call("messages.get", { id: "m" })).collectionIds.includes(
+      "ARCHIVE",
+    ),
+  );
+});
+
+test("archive moves reject impossible combinations before any provider write", async (t) => {
+  let labelIds = ["TRASH", "Label_work"];
+  const f = await fixture(t, (r) =>
+    new URL(r.url).pathname.endsWith("/labels")
+      ? response({ labels: [{ id: "INBOX" }, { id: "Label_work" }] })
+      : response({ id: "m", labelIds }),
+  );
+  const rejected = { status: "rejected", code: "invalid_request" };
+  // Removing a user label while archiving is not "remove only the source".
+  assert.deepEqual(
+    await f.call("messages.move", {
+      id: "m",
+      destinationId: "ARCHIVE",
+      sourceCollectionId: "Label_work",
+    }),
+    rejected,
+  );
+  // Leaving the archive for a user label would keep the message archived.
+  assert.deepEqual(
+    await f.call("messages.move", {
+      id: "m",
+      destinationId: "Label_work",
+      sourceCollectionId: "ARCHIVE",
+    }),
+    rejected,
+  );
+  assert.deepEqual(
+    await f.call("messages.move", {
+      id: "m",
+      destinationId: "ARCHIVE",
+      sourceCollectionId: "ARCHIVE",
+    }),
+    rejected,
+  );
+  // Trash, spam and drafts are never archived by removing INBOX.
+  for (const state of ["TRASH", "SPAM", "DRAFT"]) {
+    labelIds = [state, "INBOX"];
+    assert.deepEqual(
+      await f.call("messages.move", { id: "m", destinationId: "ARCHIVE" }),
+      rejected,
+    );
+  }
+  // Unarchiving a message that is not archived is a conflict, not a silent label add.
+  labelIds = ["INBOX"];
+  assert.deepEqual(
+    await f.call("messages.move", {
+      id: "m",
+      destinationId: "INBOX",
+      sourceCollectionId: "ARCHIVE",
+    }),
+    { status: "rejected", code: "conflict" },
+  );
+  assert.ok(f.requests.every((r) => !r.url.endsWith("/modify")));
+});
+
+test("archive listing searches outside inbox/spam/trash/drafts and drops messages that changed", async (t) => {
+  const f = await fixture(t, (r) => {
+    const u = new URL(r.url);
+    if (u.pathname.endsWith("/labels"))
+      return response({ labels: [{ id: "INBOX" }] });
+    if (u.pathname.endsWith("/messages"))
+      return response({ messages: [{ id: "a" }, { id: "b" }] });
+    return response({
+      ...textMessage(u.pathname.split("/").pop()),
+      labelIds: u.pathname.endsWith("/a") ? ["Label_work"] : ["INBOX"],
+    });
+  });
+  const result = await f.call("messages.list", {
+    collectionId: "ARCHIVE",
+    isRead: false,
+  });
+  const search = new URL(
+    f.requests.find((r) => new URL(r.url).pathname.endsWith("/messages"))!.url,
+  ).searchParams;
+  assert.equal(search.get("labelIds"), null);
+  assert.equal(
+    search.get("q"),
+    "-in:inbox -in:spam -in:trash -in:drafts is:unread",
+  );
+  assert.deepEqual(
+    result.items.map((m: any) => m.id),
+    ["a"],
+  );
+  assert.equal(result.coverage.complete, false);
+  assert.equal(result.coverage.reason, "snapshot_changed");
+  // Ordinary label listings still filter by label ID only.
+  await f.call("messages.list", { collectionId: "Label_work" });
+  const plain = new URL(f.requests.at(-3)!.url).searchParams;
+  assert.equal(plain.get("labelIds"), "Label_work");
+  assert.equal(plain.get("q"), null);
+});
+
+test("a provider label with the archive ID is used as-is", async (t) => {
+  const f = await fixture(t, (r) =>
+    new URL(r.url).pathname.endsWith("/labels")
+      ? response({ labels: [{ id: "ARCHIVE", name: "ARCHIVE" }] })
+      : response({ messages: [] }),
+  );
+  const boxes = await f.call("mailboxes.list", {});
+  assert.deepEqual(
+    boxes.items.map((m: any) => m.role),
+    [null],
+  );
+  await f.call("messages.list", { collectionId: "ARCHIVE" });
+  assert.equal(
+    new URL(f.requests.at(-1)!.url).searchParams.get("labelIds"),
+    "ARCHIVE",
+  );
+});
