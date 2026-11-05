@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/tader/switchboard-plugin-google/compare/gmail-v1.2.0...gmail-v1.3.0) (2026-11-05)
+
+
+### Features
+
+* **gmail:** expose a writable archive collection for common Email ([#5](https://github.com/tader/switchboard-plugin-google/issues/5)) ([a67900b](https://github.com/tader/switchboard-plugin-google/commit/a67900be6885fdec3f75daf6c8f6d6e945c8c9dc))
+
 ## [1.2.0](https://github.com/tader/switchboard-plugin-google/compare/gmail-v1.1.0...gmail-v1.2.0) (2026-11-04)
 
 
