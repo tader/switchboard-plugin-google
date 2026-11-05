@@ -94,6 +94,15 @@ function grant(c: Connection) {
       scopes.has(SCOPE + "compose"));
   return { read, send, organize, drafts };
 }
+// Gmail has no archive label: a message is archived when it is in All Mail but not
+// in INBOX, SPAM, TRASH or DRAFT. This synthetic collection exposes that state with
+// role "archive". Gmail system label IDs are fixed uppercase words and user labels are
+// Label_*, so the ID cannot name a provider label; a provider label with this ID wins.
+export const ARCHIVE = "ARCHIVE";
+const UNARCHIVED = ["INBOX", "SPAM", "TRASH", "DRAFT"];
+const ARCHIVE_QUERY = "-in:inbox -in:spam -in:trash -in:drafts";
+export const archived = (labels: string[]) =>
+  !labels.some((l) => UNARCHIVED.includes(l));
 const iso = (v: unknown) => {
   const d = new Date(typeof v === "string" ? v : NaN);
   return Number.isFinite(d.valueOf()) ? d.toISOString() : null;
@@ -159,7 +168,10 @@ export function project(raw: any): EmailMessage {
     ...(headers.cc ? { cc: addresses(headers.cc) } : {}),
     ...(headers.bcc ? { bcc: addresses(headers.bcc) } : {}),
     ...(headers["reply-to"] ? { replyTo: addresses(headers["reply-to"]) } : {}),
-    collectionIds: labels,
+    collectionIds:
+      archived(labels) && !labels.includes(ARCHIVE)
+        ? [...labels, ARCHIVE]
+        : labels,
     text: available ? (text ?? null) : null,
     ...(available && html !== undefined ? { html } : {}),
     contentState: available ? "available" : "unavailable",
@@ -323,9 +335,12 @@ export function createContracts(dataDir: string): ContractDefinition {
       return fail("invalid_cursor", 409);
     const data = await request(ctx, "/labels"),
       limit = input.limit ?? 50;
-    const items = (data.labels ?? []).sort((a: any, b: any) =>
-      String(a.id).localeCompare(String(b.id)),
-    );
+    const labels = data.labels ?? [];
+    const synthetic = !labels.some((l: any) => l.id === ARCHIVE);
+    const items = [
+      ...labels,
+      ...(synthetic ? [{ id: ARCHIVE, name: "Archive", archive: true }] : []),
+    ].sort((a: any, b: any) => String(a.id).localeCompare(String(b.id)));
     const roles: Record<string, string> = {
       INBOX: "inbox",
       SENT: "sent",
@@ -338,7 +353,7 @@ export function createContracts(dataDir: string): ContractDefinition {
         id: l.id,
         name: l.name,
         kind: "label",
-        role: roles[l.id] ?? null,
+        role: l.archive ? "archive" : (roles[l.id] ?? null),
         canWrite: grant(ctx.connection).organize,
       })),
       offset + limit < items.length ? String(offset + limit) : undefined,
@@ -350,19 +365,26 @@ export function createContracts(dataDir: string): ContractDefinition {
   op("messages.list", async (input, ctx) => {
     const bind = binding(ctx, "messages", input),
       token = await cursors.decode(bind, input.cursor);
+    // The archive collection is a search, unless the account really has such a label.
+    const archive =
+      input.collectionId === ARCHIVE &&
+      !((await request(ctx, "/labels")).labels ?? []).some(
+        (l: any) => l.id === ARCHIVE,
+      );
+    const q = [
+      ...(archive ? [ARCHIVE_QUERY] : []),
+      ...(input.isRead === undefined
+        ? []
+        : [input.isRead ? "is:read" : "is:unread"]),
+    ].join(" ");
     const data = await request(
       ctx,
       "/messages" +
         query({
           maxResults: input.limit ?? 50,
           pageToken: token,
-          labelIds: input.collectionId,
-          q:
-            input.isRead === undefined
-              ? undefined
-              : input.isRead
-                ? "is:read"
-                : "is:unread",
+          labelIds: archive ? undefined : input.collectionId,
+          q: q || undefined,
           includeSpamTrash: true,
         }),
     );
@@ -370,7 +392,10 @@ export function createContracts(dataDir: string): ContractDefinition {
     let missing = false;
     for (const m of data.messages ?? []) {
       try {
-        items.push(project(await get(ctx, m.id)));
+        const message = project(await get(ctx, m.id));
+        // Labels may change between the search and the read; never list a message outside the collection.
+        if (archive && !message.collectionIds.includes(ARCHIVE)) missing = true;
+        else items.push(message);
       } catch (e: any) {
         if (e.code !== "not_found") throw e;
         missing = true;
@@ -405,6 +430,37 @@ export function createContracts(dataDir: string): ContractDefinition {
   op("messages.move", async (input, ctx) => {
     const labels = await request(ctx, "/labels"),
       all = new Set((labels.labels ?? []).map((l: any) => l.id));
+    if (
+      !all.has(ARCHIVE) &&
+      [input.destinationId, input.sourceCollectionId].includes(ARCHIVE)
+    ) {
+      // Archive removes only INBOX; unarchive adds INBOX (or SPAM). Other labels stay.
+      const toArchive = input.destinationId === ARCHIVE;
+      if (
+        toArchive
+          ? ![undefined, "INBOX"].includes(input.sourceCollectionId)
+          : !["INBOX", "SPAM"].includes(input.destinationId)
+      )
+        return fail("invalid_request");
+      // Archiving cannot take a message out of spam, trash or drafts.
+      const current = await get(ctx, input.id, "minimal"),
+        state: string[] = current.labelIds ?? [];
+      if (
+        toArchive
+          ? ["SPAM", "TRASH", "DRAFT"].some((l) => state.includes(l))
+          : !archived(state)
+      )
+        return fail(toArchive ? "invalid_request" : "conflict");
+      const r = await request(
+        ctx,
+        "/messages/" + segment(input.id) + "/modify",
+        "POST",
+        toArchive
+          ? { addLabelIds: [], removeLabelIds: ["INBOX"] }
+          : { addLabelIds: [input.destinationId], removeLabelIds: [] },
+      );
+      return { status: "accepted", resourceId: r.id };
+    }
     if (
       !all.has(input.destinationId) ||
       (input.sourceCollectionId && !all.has(input.sourceCollectionId)) ||
