@@ -670,3 +670,45 @@ test("a provider label with the archive ID is used as-is", async (t) => {
     "ARCHIVE",
   );
 });
+
+test("explicit Gmail throttling retries with backoff and preserves the exact write", async (t) => {
+  let attempts = 0;
+  const f = await fixture(t, () => {
+    attempts++;
+    if (attempts === 1) return response({ error: { errors: [{ reason: "userRateLimitExceeded" }] } }, 403);
+    if (attempts === 2) return response({}, 429);
+    return response({ id: "m" });
+  });
+  const started = Date.now();
+  assert.deepEqual(await f.call("messages.update", { id: "m", changes: { isRead: true } }), { status: "accepted", resourceId: "m" });
+  assert.equal(attempts, 3);
+  assert.ok(Date.now() - started >= 650, "retries must back off");
+  assert.equal(new Set(f.requests.map((r) => r.body)).size, 1, "retries must carry identical writes");
+});
+
+test("permission failures and ambiguous transport failures never repeat writes", async (t) => {
+  const denied = await fixture(t, () => response({ error: { errors: [{ reason: "forbidden" }] } }, 403));
+  assert.deepEqual(await denied.call("messages.update", { id: "m", changes: { isRead: true } }), { status: "rejected", code: "permission_denied" });
+  assert.equal(denied.requests.length, 1);
+  const disconnected = await fixture(t, () => { throw Error("fixture connection lost"); });
+  await assert.rejects(() => disconnected.call("messages.update", { id: "m", changes: { isRead: true } }));
+  assert.equal(disconnected.requests.length, 1);
+});
+
+test("retries are bounded and honor long provider wait times", async (t) => {
+  const limited = await fixture(t, () => response({ error: { errors: [{ reason: "rateLimitExceeded" }] } }, 403));
+  await assert.rejects(() => limited.call("messages.get", { id: "m" }), { code: "rate_limited", status: 429 });
+  assert.equal(limited.requests.length, 4);
+  const longWait = await fixture(t, () => response({}, 429, { "retry-after": "120" }));
+  await assert.rejects(() => longWait.call("messages.get", { id: "m" }), { code: "rate_limited", retryAfterMs: 120000 });
+  assert.equal(longWait.requests.length, 1);
+});
+
+test("cancelling during backoff prevents another provider request", async (t) => {
+  const f = await fixture(t, () => response({}, 429));
+  const controller = new AbortController(); f.ctx.signal = controller.signal;
+  const call = f.call("messages.update", { id: "m", changes: { isRead: true } });
+  setTimeout(() => controller.abort(), 20);
+  await assert.rejects(call);
+  assert.equal(f.requests.length, 1);
+});

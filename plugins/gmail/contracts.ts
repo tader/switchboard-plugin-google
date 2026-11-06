@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { setTimeout as sleep } from "node:timers/promises";
 import type {
   Connection,
   ContractContext,
@@ -36,39 +37,51 @@ async function request(
   method = "GET",
   body?: unknown,
 ) {
-  ctx.signal.throwIfAborted();
-  const r = await ctx.request({
-    url: ROOT + path,
-    method,
-    headers: [["content-type", "application/json"]],
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
-  ctx.signal.throwIfAborted();
+  // Only retry explicit provider throttling responses: transport failures and
+  // ambiguous writes must keep their original uncertain outcome.
+  const delays = [250, 500, 1000];
+  let r: Response;
+  let limited = false;
+  for (let attempt = 0; ; attempt++) {
+    ctx.signal.throwIfAborted();
+    r = await ctx.request({
+      url: ROOT + path,
+      method,
+      headers: [["content-type", "application/json"]],
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    ctx.signal.throwIfAborted();
+    limited = r.status === 429;
+    if (r.status === 403) {
+      try {
+        const data = await r.clone().json() as any;
+        limited = Array.isArray(data?.error?.errors) && data.error.errors.some(
+          (entry: any) => ["rateLimitExceeded", "userRateLimitExceeded"].includes(entry?.reason),
+        );
+      } catch { /* An unknown 403 is not safe to retry. */ }
+    }
+    if (!limited || attempt >= delays.length) break;
+    const header = r.headers.get("retry-after");
+    const seconds = header === null ? 0 : Number(header);
+    const until = header && !Number.isFinite(seconds) ? Date.parse(header) : NaN;
+    const requested = Number.isFinite(seconds) && seconds > 0 ? seconds * 1000
+      : Number.isFinite(until) ? Math.max(0, until - Date.now()) : 0;
+    // Never ignore a longer provider backoff just to make an in-band retry.
+    if (requested > 3000) break;
+    await sleep(Math.max(delays[attempt], requested), undefined, { signal: ctx.signal });
+  }
   if (!r.ok) {
-    const code =
-      r.status === 401
-        ? "authentication_required"
-        : r.status === 403
-          ? "permission_denied"
-          : r.status === 404
-            ? "not_found"
-            : r.status === 429
-              ? "rate_limited"
-              : r.status >= 500
-                ? "source_unavailable"
-                : "invalid_request";
+    const code = r.status === 401 ? "authentication_required"
+      : limited ? "rate_limited"
+      : r.status === 403 ? "permission_denied"
+      : r.status === 404 ? "not_found"
+      : r.status >= 500 ? "source_unavailable" : "invalid_request";
     const seconds = Number(r.headers.get("retry-after"));
     throw Object.assign(Error(code), {
       code,
-      status: r.status,
-      ...(r.status === 429
-        ? {
-            retryAfterMs:
-              Number.isFinite(seconds) && seconds > 0
-                ? Math.min(86400000, seconds * 1000)
-                : 60000,
-          }
-        : {}),
+      status: limited ? 429 : r.status,
+      ...(limited ? { retryAfterMs: Number.isFinite(seconds) && seconds > 0
+        ? Math.min(86400000, seconds * 1000) : 60000 } : {}),
     });
   }
   return r.status === 204 ? {} : r.json();
