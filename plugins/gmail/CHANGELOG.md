@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.3.1](https://github.com/tader/switchboard-plugin-google/compare/gmail-v1.3.0...gmail-v1.3.1) (2026-11-06)
+
+
+### Bug Fixes
+
+* **gmail:** retry explicit provider throttling with backoff ([116903e](https://github.com/tader/switchboard-plugin-google/commit/116903e92c962e31f9af93fc8d60e7c46fdb0612))
+* **gmail:** retry explicit provider throttling with backoff ([0d61ca8](https://github.com/tader/switchboard-plugin-google/commit/0d61ca8ee7e9ede750c716a60600ee7eff13f605))
+
 ## [1.3.0](https://github.com/tader/switchboard-plugin-google/compare/gmail-v1.2.0...gmail-v1.3.0) (2026-11-05)
 
 
