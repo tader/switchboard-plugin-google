@@ -43,3 +43,36 @@ Release-please opens version and changelog pull requests from Conventional Commi
 With Switchboard's reusable-credentials support and the updated OAuth helper, named Drive, Calendar, Docs, Sheets, and Gmail connections can use one Google authorization. Shared credentials retain granted scopes and refresh centrally. Additional APIs request explicit additional consent; signing in as another account does not replace the shared account.
 
 Request policies preserve each connection's resource and access boundaries, including APIs on the same hostname. Read-only shared connections permit GET/HEAD requests; create a private authorization for read operations requiring POST. Drive's file-only mode cannot reuse a grant containing broader Drive scopes. Gmail's send and modify modes retain their narrower permissions. Generic wildcard Google APIs and service-account connections remain independent until they have an appropriate reusable-credential contract.
+
+## Activity response previews
+
+Switchboard 0.17.0 can retain one top-level string (up to 32 UTF-8 bytes)
+from the following exact, query-free HTTPS GET requests on a Google OAuth
+connection, subject to the server's activity preview retention setting.
+
+| Service | URL | Field |
+| --- | --- | --- |
+| Gmail | `https://gmail.googleapis.com/gmail/v1/users/me/labels/INBOX` | `type` |
+| Google Calendar | `https://www.googleapis.com/calendar/v3/colors` | `updated` |
+| Google Drive, Google APIs, Google Docs, Google Sheets | `https://www.googleapis.com/drive/v3/files` | `kind`, when present |
+
+Drive calls still require existing Drive permissions. With Google APIs, choose
+a suitable Drive scope. With Google Docs or Sheets, use the existing Drive-enabled
+access option. Drive file lists, pagination tokens, document and spreadsheet
+contents, Google Keep responses, and delegated service-account calls are outside
+preview coverage.
+
+Response shapes follow Google's [Gmail label][label], [Calendar colors][colors],
+and [Drive file list][files] references.
+
+[label]: https://developers.google.com/workspace/gmail/api/reference/rest/v1/users.labels
+[colors]: https://developers.google.com/workspace/calendar/api/v3/reference/colors
+[files]: https://developers.google.com/workspace/drive/api/reference/rest/v3/files/list
+
+To exercise the installed plugin declarations and encrypted activity preview
+storage with synthetic provider responses, install dependencies in a Switchboard
+`v0.17.0` checkout, then run with Node 24:
+
+```sh
+SWITCHBOARD_ROOT=/path/to/switchboard node scripts/output-preview-integration.ts
+```

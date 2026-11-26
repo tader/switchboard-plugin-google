@@ -10,32 +10,36 @@ const SCOPES: Record<string, string[]> = {
 
 export default function setup(ctx: PluginContext) {
   const { googleService } = ctx.require<ReturnType<typeof Google.default>['exports']>('google');
-  return {
-    services: [
-      googleService({
-        id: 'google-sheets',
-        name: 'Google Sheets',
-        description: 'Spreadsheets',
-        icon: 'icon.svg',
-        docsUrl: 'https://developers.google.com/sheets/api/reference/rest',
-        baseUrl: 'https://sheets.googleapis.com',
-        allowedHosts: ['sheets.googleapis.com', 'www.googleapis.com'],
-        openapi: 'https://api.apis.guru/v2/specs/googleapis.com/sheets/v4/openapi.json',
-        fields: [
-          {
-            key: 'access',
-            label: 'Access',
-            type: 'select',
-            default: 'full',
-            options: [
-              { value: 'readonly', label: 'View spreadsheets' },
-              { value: 'full', label: 'View and edit spreadsheets' },
-              { value: 'full-drive', label: 'View and edit spreadsheets, and find them in Drive' },
-            ],
-          },
+  const service = googleService({
+    id: 'google-sheets',
+    name: 'Google Sheets',
+    description: 'Spreadsheets',
+    icon: 'icon.svg',
+    docsUrl: 'https://developers.google.com/sheets/api/reference/rest',
+    baseUrl: 'https://sheets.googleapis.com',
+    allowedHosts: ['sheets.googleapis.com', 'www.googleapis.com'],
+    openapi: 'https://api.apis.guru/v2/specs/googleapis.com/sheets/v4/openapi.json',
+    fields: [
+      {
+        key: 'access',
+        label: 'Access',
+        type: 'select',
+        default: 'full',
+        options: [
+          { value: 'readonly', label: 'View spreadsheets' },
+          { value: 'full', label: 'View and edit spreadsheets' },
+          { value: 'full-drive', label: 'View and edit spreadsheets, and find them in Drive' },
         ],
-        scopes: (c) => SCOPES[c.access] ?? SCOPES.full,
-      }),
+      },
     ],
-  };
+    scopes: (c) => SCOPES[c.access] ?? SCOPES.full,
+  });
+  service.outputPreviews = [{
+    origin: 'https://www.googleapis.com',
+    method: 'GET',
+    path: '/drive/v3/files',
+    authMethods: ['oauth'],
+    fields: { kind: { maxBytes: 32 } },
+  }];
+  return { services: [service] };
 }

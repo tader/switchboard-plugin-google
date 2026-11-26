@@ -44,6 +44,13 @@ export default function setup(ctx: PluginContext) {
           ],
           scopes: (c) => SCOPES[c.access] ?? SCOPES.modify,
         }),
+        outputPreviews: [{
+          origin: "https://gmail.googleapis.com",
+          method: "GET" as const,
+          path: "/gmail/v1/users/me/labels/INBOX",
+          authMethods: ["oauth"],
+          fields: { type: { maxBytes: 32 } },
+        }],
         contracts: createContracts(ctx.dataDir),
       },
     ],
