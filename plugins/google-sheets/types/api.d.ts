@@ -197,7 +197,16 @@ export interface AuthMethod {
     /** Called when the connection is deleted. */
     revoke?(conn: Connection): Promise<void>;
 }
+export interface OutputPreviewRule {
+    origin: string;
+    method: 'GET';
+    path: string;
+    authMethods: string[];
+    fields: Record<string, { maxBytes: number }>;
+}
+
 export interface ServiceDefinition {
+    outputPreviews?: OutputPreviewRule[];
     /** Omitted by existing plugins; defaults to HTTP. */
     kind?: ConnectionKind;
     /** Globally unique, e.g. "gmail". */

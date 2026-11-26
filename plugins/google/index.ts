@@ -176,6 +176,13 @@ export default function setup(ctx: PluginContext) {
     serviceAccount: true,
     fields: [{ key: 'scopes', label: 'Scopes', type: 'textarea', required: true, placeholder: 'https://www.googleapis.com/auth/drive.readonly', description: 'Separated by spaces or new lines' }],
   });
+  generic.outputPreviews = [{
+    origin: 'https://www.googleapis.com',
+    method: 'GET',
+    path: '/drive/v3/files',
+    authMethods: ['oauth'],
+    fields: { kind: { maxBytes: 32 } },
+  }];
   generic.openapi = (conn: Connection) => conn.config.openapi || undefined;
   for (const m of generic.authMethods) m.fields!.push({ key: 'openapi', label: 'OpenAPI URL', type: 'url', advanced: true });
 

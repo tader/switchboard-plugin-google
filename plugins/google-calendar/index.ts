@@ -36,6 +36,13 @@ export default function setup(ctx: PluginContext) {
               : "https://www.googleapis.com/auth/calendar",
           ],
         }),
+        outputPreviews: [{
+          origin: "https://www.googleapis.com",
+          method: "GET" as const,
+          path: "/calendar/v3/colors",
+          authMethods: ["oauth"],
+          fields: { updated: { maxBytes: 32 } },
+        }],
         contracts,
       },
     ],
