@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.0](https://github.com/tader/switchboard-plugin-google/compare/gmail-v1.3.1...gmail-v1.4.0) (2026-11-26)
+
+
+### Features
+
+* add reviewed Google activity response previews ([de2d696](https://github.com/tader/switchboard-plugin-google/commit/de2d6967ba9d9e59ad14310d95ea2f9b2426df00))
+
 ## [1.3.1](https://github.com/tader/switchboard-plugin-google/compare/gmail-v1.3.0...gmail-v1.3.1) (2026-11-06)
 
 

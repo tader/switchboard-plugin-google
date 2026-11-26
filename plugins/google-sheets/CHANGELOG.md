@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/tader/switchboard-plugin-google/compare/google-sheets-v1.1.0...google-sheets-v1.2.0) (2026-11-26)
+
+
+### Features
+
+* add reviewed Google activity response previews ([de2d696](https://github.com/tader/switchboard-plugin-google/commit/de2d6967ba9d9e59ad14310d95ea2f9b2426df00))
+
 ## [1.1.0](https://github.com/tader/switchboard-plugin-google/compare/google-sheets-v1.0.0...google-sheets-v1.1.0) (2026-10-14)
 
 
